@@ -5,6 +5,11 @@
 
 原版右下角的署名水印文字**已移除**。
 
+## 在线预览
+
+- 合并版（四色可切换，推荐分享）: https://suxiao007.github.io/christmas-tree/xmas-all.html
+- - 四色画廊: https://suxiao007.github.io/christmas-tree/
+
 ---
 
 ## 文件
