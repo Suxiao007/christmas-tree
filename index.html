@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Merry Christmas · 四色圣诞树</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%}
+  body{
+    background:
+      radial-gradient(90% 60% at 50% -10%, #1a1030 0%, transparent 65%),
+      radial-gradient(70% 50% at 85% 100%, #08131f 0%, transparent 70%),
+      #05050a;
+    color:#fff;
+    font-family:"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+    padding:clamp(28px,5vw,72px) clamp(18px,4vw,64px) 56px;
+    -webkit-font-smoothing:antialiased;
+  }
+  header{max-width:1180px;margin:0 auto 44px;text-align:center}
+  h1{
+    display:inline-block;
+    margin:0 0 10px;
+    font-family:"Monotype Corsiva","Segoe Script","Brush Script MT",cursive;
+    font-size:clamp(34px,6vw,76px);font-weight:400;letter-spacing:.01em;
+    background:linear-gradient(92deg,#ff9ed8,#ffd06b 34%,#8cf0b4 62%,#8ec6ff);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 0 26px rgba(255,255,255,.14));
+  }
+  .sub{font-size:clamp(12px,1.5vw,15px);letter-spacing:.42em;color:rgba(255,255,255,.42);margin-bottom:16px}
+  .desc{max-width:660px;margin:0 auto;font-size:13.5px;line-height:1.9;color:rgba(255,255,255,.46)}
+  .desc code{font-family:ui-monospace,Consolas,monospace;color:rgba(255,255,255,.72);font-size:12.5px}
+
+  .grid{
+    max-width:1180px;margin:0 auto;
+    display:grid;gap:clamp(16px,2.4vw,26px);
+    grid-template-columns:repeat(auto-fit,minmax(238px,1fr));
+  }
+  .card{
+    position:relative;display:block;text-decoration:none;color:#fff;
+    border:1px solid rgba(255,255,255,.09);
+    border-radius:20px;padding:26px 24px 22px;
+    background:linear-gradient(160deg, var(--c1), rgba(8,8,14,.94) 68%);
+    overflow:hidden;isolation:isolate;
+    transition:transform .28s cubic-bezier(.2,.8,.3,1), box-shadow .28s, border-color .28s;
+  }
+  .card::before{
+    content:"";position:absolute;inset:-40% -20% auto;height:120%;
+    background:radial-gradient(50% 50% at 50% 0%, var(--c2), transparent 70%);
+    opacity:.55;z-index:-1;transition:opacity .3s;
+  }
+  .card:hover{
+    transform:translateY(-6px);
+    border-color:color-mix(in srgb, var(--c2) 55%, transparent);
+    box-shadow:0 18px 46px -18px var(--c2), 0 0 0 1px rgba(255,255,255,.05) inset;
+  }
+  .card:hover::before{opacity:.95}
+  .tree{display:block;width:56px;height:66px;margin:2px auto 16px;color:var(--c2);
+        filter:drop-shadow(0 0 12px var(--c2))}
+  .name{text-align:center;font-size:19px;letter-spacing:.14em;margin:0 0 4px}
+  .en{text-align:center;font-size:11px;letter-spacing:.34em;color:rgba(255,255,255,.38);
+      text-transform:uppercase;margin-bottom:18px}
+  .go{
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    font-size:12.5px;letter-spacing:.2em;color:rgba(255,255,255,.72);
+    border-top:1px solid rgba(255,255,255,.08);padding-top:14px;
+    transition:color .25s;
+  }
+  .card:hover .go{color:#fff}
+  .go i{font-style:normal;transition:transform .28s}
+  .card:hover .go i{transform:translateX(5px)}
+
+  footer{
+    max-width:1180px;margin:52px auto 0;padding-top:22px;
+    border-top:1px solid rgba(255,255,255,.07);
+    display:flex;flex-wrap:wrap;gap:10px 26px;justify-content:space-between;
+    font-size:12px;color:rgba(255,255,255,.3);
+  }
+  footer a{color:rgba(255,255,255,.45);text-decoration:none;border-bottom:1px dotted rgba(255,255,255,.2)}
+  footer a:hover{color:#fff}
+  .tag{border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:3px 11px;font-size:11px;letter-spacing:.1em}
+
+  /* ---- one-file share banner ---- */
+  .share{
+    display:flex;align-items:center;gap:clamp(14px,2vw,28px);flex-wrap:wrap;
+    max-width:1180px;margin:0 auto clamp(22px,3vw,34px);
+    padding:20px clamp(18px,2.6vw,30px);
+    text-decoration:none;color:#fff;
+    border:1px solid rgba(255,255,255,.13);border-radius:20px;
+    background:linear-gradient(100deg, rgba(255,158,216,.10), rgba(255,208,107,.08) 30%, rgba(140,240,180,.08) 62%, rgba(142,198,255,.12));
+    transition:border-color .28s, box-shadow .28s, transform .28s;
+  }
+  .share:hover{
+    border-color:rgba(255,255,255,.26);transform:translateY(-3px);
+    box-shadow:0 18px 46px -22px rgba(160,180,255,.5);
+  }
+  .share-txt{flex:1 1 320px;min-width:0}
+  .share-txt b{display:block;font-size:16.5px;letter-spacing:.06em;margin-bottom:6px;font-weight:600}
+  .share-txt span{font-size:12.5px;line-height:1.75;color:rgba(255,255,255,.5)}
+  .share-txt em{font-style:normal;color:rgba(255,255,255,.75)}
+  .pills{display:flex;gap:9px;flex:0 0 auto}
+  .pills i{width:15px;height:15px;border-radius:50%;background:var(--d);box-shadow:0 0 14px var(--d);display:block}
+  .go2{
+    flex:0 0 auto;display:flex;align-items:center;gap:8px;
+    font-size:12.5px;letter-spacing:.16em;color:rgba(255,255,255,.8);
+    border:1px solid rgba(255,255,255,.2);border-radius:999px;padding:9px 18px;
+    white-space:nowrap;
+  }
+  .share:hover .go2{background:rgba(255,255,255,.1)}
+</style>
+</head>
+<body>
+<header>
+  <div class="sub">MERRY CHRISTMAS</div>
+  <h1>四色圣诞树</h1>
+  <p class="desc">
+    由 <code>ZekangLi-Zico/Christmas-Tree</code>（Pygame 版）移植的网页版本 · 纯 WebGL 粒子渲染<br />
+    粉色 / 金色 / 绿色 / 蓝色 四套配色，已移除原版右下角的署名水印文字
+  </p>
+</header>
+
+<a class="share" href="xmas-all.html">
+  <div class="share-txt">
+    <b>手机分享版 · 一个文件四套配色</b>
+    <span>发到微信 / 手机上直接用浏览器打开即可；点右下角四个色点实时换色，不用来回切文件 · <em>21 KB</em></span>
+  </div>
+  <div class="pills"><i style="--d:#ff9ed8"></i><i style="--d:#ffd06b"></i><i style="--d:#8cf0b4"></i><i style="--d:#8ec6ff"></i></div>
+  <span class="go2">打开合并版 →</span>
+</a>
+
+<main class="grid">
+  <a class="card" href="xmas-pink.html" style="--c1:rgba(72,8,40,.34);--c2:#ff9ed8">
+    <svg class="tree" viewBox="0 0 56 66" aria-hidden="true">
+      <path d="M28 3 L33.4 16 L22.6 16 Z" fill="currentColor" opacity=".95"/>
+      <path d="M28 13 L38.5 31 L17.5 31 Z" fill="currentColor" opacity=".8"/>
+      <path d="M28 26 L44.5 47 L11.5 47 Z" fill="currentColor" opacity=".62"/>
+      <rect x="25" y="47" width="6" height="9" rx="1.5" fill="currentColor" opacity=".45"/>
+      <circle cx="28" cy="4.6" r="2.7" fill="#fff" opacity=".92"/>
+    </svg>
+    <h2 class="name">粉色</h2>
+    <div class="en">Pink</div>
+    <div class="go">打开预览 <i>&#8594;</i></div>
+  </a>
+  <a class="card" href="xmas-gold.html" style="--c1:rgba(78,50,4,.30);--c2:#ffd06b">
+    <svg class="tree" viewBox="0 0 56 66" aria-hidden="true">
+      <path d="M28 3 L33.4 16 L22.6 16 Z" fill="currentColor" opacity=".95"/>
+      <path d="M28 13 L38.5 31 L17.5 31 Z" fill="currentColor" opacity=".8"/>
+      <path d="M28 26 L44.5 47 L11.5 47 Z" fill="currentColor" opacity=".62"/>
+      <rect x="25" y="47" width="6" height="9" rx="1.5" fill="currentColor" opacity=".45"/>
+      <circle cx="28" cy="4.6" r="2.7" fill="#fff" opacity=".92"/>
+    </svg>
+    <h2 class="name">金色</h2>
+    <div class="en">Gold</div>
+    <div class="go">打开预览 <i>&#8594;</i></div>
+  </a>
+  <a class="card" href="xmas-green.html" style="--c1:rgba(6,62,32,.30);--c2:#8cf0b4">
+    <svg class="tree" viewBox="0 0 56 66" aria-hidden="true">
+      <path d="M28 3 L33.4 16 L22.6 16 Z" fill="currentColor" opacity=".95"/>
+      <path d="M28 13 L38.5 31 L17.5 31 Z" fill="currentColor" opacity=".8"/>
+      <path d="M28 26 L44.5 47 L11.5 47 Z" fill="currentColor" opacity=".62"/>
+      <rect x="25" y="47" width="6" height="9" rx="1.5" fill="currentColor" opacity=".45"/>
+      <circle cx="28" cy="4.6" r="2.7" fill="#fff" opacity=".92"/>
+    </svg>
+    <h2 class="name">绿色</h2>
+    <div class="en">Green</div>
+    <div class="go">打开预览 <i>&#8594;</i></div>
+  </a>
+  <a class="card" href="xmas-blue.html" style="--c1:rgba(6,38,80,.34);--c2:#8ec6ff">
+    <svg class="tree" viewBox="0 0 56 66" aria-hidden="true">
+      <path d="M28 3 L33.4 16 L22.6 16 Z" fill="currentColor" opacity=".95"/>
+      <path d="M28 13 L38.5 31 L17.5 31 Z" fill="currentColor" opacity=".8"/>
+      <path d="M28 26 L44.5 47 L11.5 47 Z" fill="currentColor" opacity=".62"/>
+      <rect x="25" y="47" width="6" height="9" rx="1.5" fill="currentColor" opacity=".45"/>
+      <circle cx="28" cy="4.6" r="2.7" fill="#fff" opacity=".92"/>
+    </svg>
+    <h2 class="name">蓝色</h2>
+    <div class="en">Blue</div>
+    <div class="go">打开预览 <i>&#8594;</i></div>
+  </a>
+</main>
+
+<footer>
+  <span>点击卡片进入对应配色 · 页面内按 1-4 快速切换 / F 全屏 / 空格暂停</span>
+  <span class="tag">HTML · 单文件 · 无需联网</span>
+</footer>
+</body>
+</html>

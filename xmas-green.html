@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#05050a" />
+<title>Merry Christmas · 绿色 Green</title>
+<style>
+  :root{
+    --accent: #8cf0b4;
+    --bg1: rgba(6,62,32,.44);
+    --bg2: rgba(2,16,9,.94);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;overflow:hidden;background:#000}
+  body::before{
+    content:"";position:fixed;inset:0;pointer-events:none;
+    background:
+      radial-gradient(115% 90% at 50% 64%, var(--bg1) 0%, var(--bg2) 36%, #000 76%),
+      radial-gradient(55% 45% at 14% 6%, rgba(255,255,255,.05), transparent 72%);
+  }
+  canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
+  #snow{pointer-events:none}
+
+  .title{
+    position:fixed;left:3.2vw;top:calc(32vh - 1.1em);
+    font-family:"Monotype Corsiva","Segoe Script","Brush Script MT","Lucida Handwriting","STKaiti","KaiTi",cursive;
+    font-size:clamp(26px,3.4vw,60px);
+    font-weight:400;letter-spacing:.015em;line-height:1.15;
+    color:#fff;
+    text-shadow:0 0 4px #fff, 0 0 14px var(--accent), 0 0 34px var(--accent), 0 0 80px var(--accent);
+    opacity:.96;user-select:none;pointer-events:none;white-space:nowrap;
+  }
+  .title .cn{
+    display:block;margin-top:.15em;
+    font-family:"STKaiti","KaiTi","Noto Serif SC",serif;
+    font-size:.42em;letter-spacing:.42em;opacity:.6;
+    text-shadow:0 0 10px var(--accent);color:var(--accent);
+    -webkit-font-smoothing:antialiased;
+  }
+
+  .hud{position:fixed;right:20px;bottom:18px;display:flex;gap:11px;align-items:center;z-index:5}
+  .dot{
+    width:15px;height:15px;border-radius:50%;display:block;
+    border:1px solid rgba(255,255,255,.5);
+    opacity:.5;transition:transform .2s,opacity .2s,box-shadow .2s;
+    cursor:pointer;
+  }
+  .dot:hover{opacity:1;transform:scale(1.3)}
+  .dot.on{opacity:1;transform:scale(1.15);box-shadow:0 0 14px currentColor, inset 0 0 4px #fff}
+
+  .hint{
+    position:fixed;left:3.2vw;bottom:16px;
+    font:11px/1.7 ui-monospace,"Consolas","Cascadia Mono",monospace;
+    color:rgba(255,255,255,.24);letter-spacing:.1em;user-select:none;pointer-events:none;
+  }
+  .hint b{color:rgba(255,255,255,.42);font-weight:400}
+
+  @media (max-width:640px){
+    .title{top:calc(26vh - 1em)}
+    .hint{font-size:10px}
+  }
+
+  /* ---------- one-file (share) mode : big touch targets ---------- */
+  .single .hud{
+    right:50%;transform:translateX(50%);bottom:max(26px, env(safe-area-inset-bottom));
+    gap:20px;
+  }
+  .single .dot{
+    width:28px;height:28px;border-width:1.5px;
+    box-shadow:0 0 0 8px transparent;
+  }
+  .single .dot.on{transform:scale(1.08)}
+  .single .hint{display:none}
+  .single .title .cn{letter-spacing:.5em;text-indent:.5em}
+  @media (orientation:portrait){
+    .single .title{left:50%;transform:translateX(-50%);top:max(9vh,60px);
+                   text-align:center;font-size:clamp(22px,7vw,44px);
+                   white-space:nowrap;max-width:96vw}
+    .single .title .cn{letter-spacing:.3em;text-indent:.3em}
+  }
+  .dot{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<canvas id="snow"></canvas>
+
+<div class="title">Merry Christmas<span class="cn">圣 诞 快 乐</span></div>
+
+<div class="hud" id="hud"></div>
+<div class="hint"><b>1-4</b> 换配色 &nbsp;·&nbsp; <b>F</b> 全屏 &nbsp;·&nbsp; <b>空格</b> 暂停</div>
+
+<script>
+"use strict";
+(function () {
+
+  /* ============================================================
+   *  Four colour themes (ported from ZekangLi-Zico/Christmas-Tree)
+   * ============================================================ */
+  const THEMES = {
+    pink:  { label: "粉色 Pink",  hue: 336, heartHue: 342, color: "#ff9ed8",
+             bg1: "rgba(72,8,40,.58)",  bg2: "rgba(20,2,12,.94)" },
+    gold:  { label: "金色 Gold",  hue: 44,  heartHue: 28,  color: "#ffd06b",
+             bg1: "rgba(78,50,4,.46)",  bg2: "rgba(18,11,2,.94)" },
+    green: { label: "绿色 Green", hue: 140, heartHue: 152, color: "#8cf0b4",
+             bg1: "rgba(6,62,32,.44)",  bg2: "rgba(2,16,9,.94)" },
+    blue:  { label: "蓝色 Blue",  hue: 205, heartHue: 214, color: "#8ec6ff",
+             bg1: "rgba(6,38,80,.52)",  bg2: "rgba(2,9,22,.94)" }
+  };
+
+  const SINGLE = false;
+  let   KEY    = "green";
+  let   theme  = THEMES[KEY] || THEMES.pink;
+
+  /* ---------------- scene constants (same as tree.py) ---------------- */
+  const TAU         = Math.PI * 2;
+  const TREE_HEIGHT = 12.0;
+  const CAM_DIST    = 13.0;
+  const CAM_HEIGHT  = 6.0;
+  const PITCH       = -0.25;
+  const LOOPS       = 9;
+  const SPEED       = 0.27;          // rad / second  (0.0045 * 60fps)
+
+  const N_TREE   = 50000;
+  const N_GROUND = 4000;
+  const N_STAR   = 1200;
+  const N_HEART  = 1000;
+
+  /* ---------------- helpers ---------------- */
+  const rand = (a, b) => a + Math.random() * (b - a);
+
+  function hsl2rgb(h, s, l) {
+    h = ((h % 360) + 360) % 360;
+    const c = (1 - Math.abs(2 * l - 1)) * s;
+    const hp = h / 60;
+    const x  = c * (1 - Math.abs((hp % 2) - 1));
+    let r = 0, g = 0, b = 0;
+    if      (hp < 1) { r = c; g = x; }
+    else if (hp < 2) { r = x; g = c; }
+    else if (hp < 3) { g = c; b = x; }
+    else if (hp < 4) { g = x; b = c; }
+    else if (hp < 5) { r = x; b = c; }
+    else             { r = c; b = x; }
+    const m = l - c / 2;
+    return [r + m, g + m, b + m];
+  }
+
+  function gauss(mu, sd) {
+    let u = 0, v = 0;
+    while (u === 0) u = Math.random();
+    while (v === 0) v = Math.random();
+    return mu + sd * Math.sqrt(-2 * Math.log(u)) * Math.cos(TAU * v);
+  }
+
+  /* ---------------- point generators ---------------- */
+
+  // 70% spiral light ribbon + 30% fuzzy fill  (cf. gen_tree_points)
+  function genTree(scale) {
+    const out = [];
+    const n = Math.round(N_TREE * scale);
+    const spiralN = Math.round(n * 0.7);
+    const H = theme.hue;
+
+    for (let i = 0; i < spiralN; i++) {
+      const u = Math.random();
+      const h = Math.pow(u, 1.6);                     // denser at the bottom
+      const y = TREE_HEIGHT * h + 0.2;
+
+      let baseR = Math.pow(1 - h, 1.1) * 3.2;
+      const wave = Math.max(0, Math.sin((h * 5.8 + 0.15) * TAU));
+      baseR *= 1 + 0.65 * wave;
+
+      const t     = u * LOOPS * TAU;
+      const angle = t + rand(-0.22, 0.22);
+      const r     = baseR * rand(0.85, 1.08);
+
+      const x = Math.cos(angle) * r;
+      const z = Math.sin(angle) * r;
+
+      let mb = 1 - Math.abs(h - 0.55) * 1.5;          // brighter mid
+      mb = Math.max(0.15, mb);
+
+      let col;
+      if (Math.random() < 0.08) {                     // bright little bulbs
+        col = hsl2rgb(H + rand(-14, 14), rand(0.14, 0.34), rand(0.95, 1.0));
+      } else {
+        col = hsl2rgb(H + rand(-11, 11),
+                      Math.min(1, 0.50 + 0.38 * mb),
+                      Math.min(1, 0.58 + 0.30 * mb + rand(-0.05, 0.07)));
+      }
+      out.push([x, y, z, col[0] * 0.85, col[1] * 0.85, col[2] * 0.85]);
+    }
+
+    for (let i = 0; i < n - spiralN; i++) {           // fuzzy fill
+      const h = Math.pow(Math.random(), 1.9);
+      const y = TREE_HEIGHT * h + 0.2 + rand(-0.08, 0.08);
+
+      let baseR = Math.pow(1 - h, 1.1) * 4.3;
+      const wave = Math.max(0, Math.sin((h * 5.8 + 0.15) * TAU));
+      baseR *= 1 + 0.65 * wave;
+
+      const r     = baseR * Math.sqrt(Math.random());
+      const angle = Math.random() * TAU;
+
+      const x = Math.cos(angle) * r + rand(-0.08, 0.08);
+      const z = Math.sin(angle) * r + rand(-0.08, 0.08);
+
+      const col = hsl2rgb(H + rand(-16, 16), rand(0.28, 0.72), rand(0.52, 0.86));
+      out.push([x, y, z, col[0] * 0.95, col[1] * 0.95, col[2] * 0.95]);
+    }
+    return out;
+  }
+
+  // ground rings (cf. gen_ground_points)
+  function genGround(scale) {
+    const out = [];
+    const rings = [4.6, 6.0, 7.4, 8.8, 10.2, 11.4];
+    const n = Math.round(N_GROUND * scale);
+    for (let i = 0; i < n; i++) {
+      const ring  = rings[(Math.random() * rings.length) | 0];
+      const r     = gauss(ring, 0.3);
+      const theta = Math.random() * TAU;
+      const x = Math.cos(theta) * r;
+      const z = Math.sin(theta) * r;
+      const y = -0.25;
+      const l = Math.random() < 0.15 ? rand(0.94, 1.0) : rand(0.76, 0.94);
+      const col = hsl2rgb(theme.hue + rand(-16, 16), rand(0.18, 0.44), l);
+      out.push([x, y, z, col[0] * 0.95, col[1] * 0.95, col[2] * 0.95]);
+    }
+    return out;
+  }
+
+  // floating 3D snow-stars (cf. gen_star_points)
+  function genStars(scale) {
+    const out = [];
+    const n = Math.round(N_STAR * scale);
+    for (let i = 0; i < n; i++) {
+      const x = rand(-18, 18);
+      const z = rand(-18, 18);
+      const y = rand(3, 18);
+      const col = hsl2rgb(theme.hue + rand(-20, 20), rand(0.10, 0.38), rand(0.86, 1.0));
+      out.push([x, y, z, col[0] * 0.85, col[1] * 0.85, col[2] * 0.85]);
+    }
+    return out;
+  }
+
+  // 2D heart implicit curve -> 3D heart on top of the tree (cf. gen_heart_points)
+  function genHeart(scale) {
+    const out = [];
+    const n     = Math.round(N_HEART * 1.9 * scale);
+    const S     = 1.28;
+    const topY  = TREE_HEIGHT + 0.08;
+    let guard = 0;
+    while (out.length < n && guard++ < n * 400) {
+      const x = rand(-1.3, 1.3);
+      const y = rand(-1.4, 1.4);
+      const f = Math.pow(x * x + y * y - 1, 3) - x * x * (y * y * y);
+      if (f > 0) continue;          // outside the heart
+      if (f < -0.12) continue;      // keep only the thin band on the curve
+
+      const wx = x * S * 0.8;
+      const wy = topY + (y + 1) * S * 0.5;
+      const wz = rand(-0.18, 0.18);
+
+      const col = hsl2rgb(theme.heartHue + rand(-7, 7), rand(0.78, 0.98), rand(0.72, 0.95));
+      out.push([wx, wy, wz, col[0] * 0.72, col[1] * 0.72, col[2] * 0.72]);
+    }
+    return out;
+  }
+
+  function packAll(scale) {
+    const groups = [genTree(scale), genGround(scale), genStars(scale), genHeart(scale)];
+    let total = 0;
+    for (const g of groups) total += g.length;
+    const buf = new Float32Array(total * 6);
+    const col = new Float32Array(total * 3);
+    let o = 0, c = 0;
+    for (const g of groups) {
+      for (let i = 0; i < g.length; i++) {
+        const p = g[i];
+        buf[o++] = p[0]; buf[o++] = p[1]; buf[o++] = p[2];
+        buf[o++] = p[3]; buf[o++] = p[4]; buf[o++] = p[5];
+      }
+    }
+    // split into two tight attribute arrays for clarity
+    const pos = new Float32Array(total * 3);
+    const rgb = new Float32Array(total * 3);
+    for (let i = 0, j = 0; i < total * 6; i += 6, j += 3) {
+      pos[j] = buf[i]; pos[j + 1] = buf[i + 1]; pos[j + 2] = buf[i + 2];
+      rgb[j] = buf[i + 3]; rgb[j + 1] = buf[i + 4]; rgb[j + 2] = buf[i + 5];
+    }
+    return { pos, rgb, count: total };
+  }
+
+  /* ============================================================
+   *  Renderer 1 : WebGL point sprites (default, additive glow)
+   * ============================================================ */
+  const canvas = document.getElementById("gl");
+  const DPR    = Math.min(window.devicePixelRatio || 1, 2);
+
+  const VS = `
+    attribute vec3 aPos;
+    attribute vec3 aColor;
+    uniform float uAngle, uPitch, uCamDist, uCamHeight, uW, uH, uDpr, uScale, uZoom;
+    varying vec3 vColor;
+    void main() {
+      float ca = cos(uAngle), sa = sin(uAngle);
+      float xz = aPos.x * ca - aPos.z * sa;
+      float zz = aPos.x * sa + aPos.z * ca;
+
+      float cp = cos(uPitch), sp = sin(uPitch);
+      float yp = aPos.y * cp - zz * sp;
+      float zp = aPos.y * sp + zz * cp + uCamDist;
+      yp -= uCamHeight;
+
+      vColor = aColor;
+      if (zp <= 0.1) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); gl_PointSize = 0.0; return; }
+
+      float f  = (uH * 0.63) / zp * uZoom;
+      float sx = uW * 0.5 + xz * f;
+      float sy = uH * 0.5 - yp * f;
+
+      gl_Position  = vec4(sx / uW * 2.0 - 1.0, 1.0 - sy / uH * 2.0, 0.0, 1.0);
+      gl_PointSize = max(1.0, (3.3 - zp * 0.115) * uScale) * uDpr;
+    }`;
+
+  const FS = `
+    precision mediump float;
+    varying vec3 vColor;
+    void main() {
+      float r = length(gl_PointCoord - vec2(0.5)) * 2.0;
+      if (r > 1.0) discard;
+      float a = pow(1.0 - r, 1.65);
+      gl_FragColor = vec4(vColor * a * 0.9, a);
+    }`;
+
+  function compile(gl, type, src) {
+    const sh = gl.createShader(type);
+    gl.shaderSource(sh, src);
+    gl.compileShader(sh);
+    if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
+      console.error(gl.getShaderInfoLog(sh), src);
+      return null;
+    }
+    return sh;
+  }
+
+  let gl = null;
+  try {
+    gl = canvas.getContext("webgl", {
+      alpha: true, antialias: false, depth: false,
+      premultipliedAlpha: false, powerPreference: "high-performance"
+    }) || canvas.getContext("experimental-webgl");
+  } catch (e) { gl = null; }
+
+  let prog = null, loc = {}, data = null, bPos = null, bCol = null;
+
+  if (gl) {
+    const vs = compile(gl, gl.VERTEX_SHADER, VS);
+    const fs = compile(gl, gl.FRAGMENT_SHADER, FS);
+    prog = gl.createProgram();
+    gl.attachShader(prog, vs);
+    gl.attachShader(prog, fs);
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+      console.error("link failed", gl.getProgramInfoLog(prog));
+      prog = null;
+    }
+  }
+
+  let mode = "webgl";
+  let ctx2 = null, idx = null;
+
+  // (re)generate every particle for the current theme and push it to the GPU
+  function buildPoints() {
+    const scale = (gl && prog) ? 1.0 : 0.34;
+    data = packAll(scale);
+    if (gl && prog) {
+      gl.bindBuffer(gl.ARRAY_BUFFER, bPos);
+      gl.bufferData(gl.ARRAY_BUFFER, data.pos, gl.STATIC_DRAW);
+      gl.bindBuffer(gl.ARRAY_BUFFER, bCol);
+      gl.bufferData(gl.ARRAY_BUFFER, data.rgb, gl.STATIC_DRAW);
+    } else {
+      idx = new Int32Array(data.count);
+      for (let i = 0; i < data.count; i++) idx[i] = i;
+    }
+  }
+
+  if (prog) {
+    gl.useProgram(prog);
+
+    bPos = gl.createBuffer();
+    bCol = gl.createBuffer();
+    buildPoints();
+
+    const aPos = gl.getAttribLocation(prog, "aPos");
+    gl.bindBuffer(gl.ARRAY_BUFFER, bPos);
+    gl.enableVertexAttribArray(aPos);
+    gl.vertexAttribPointer(aPos, 3, gl.FLOAT, false, 0, 0);
+
+    const aCol = gl.getAttribLocation(prog, "aColor");
+    gl.bindBuffer(gl.ARRAY_BUFFER, bCol);
+    gl.enableVertexAttribArray(aCol);
+    gl.vertexAttribPointer(aCol, 3, gl.FLOAT, false, 0, 0);
+
+    ["uAngle", "uPitch", "uCamDist", "uCamHeight", "uW", "uH", "uDpr", "uScale", "uZoom"]
+      .forEach(n => { loc[n] = gl.getUniformLocation(prog, n); });
+
+    gl.uniform1f(loc.uPitch, PITCH);
+    gl.uniform1f(loc.uCamDist, CAM_DIST);
+    gl.uniform1f(loc.uCamHeight, CAM_HEIGHT);
+    gl.uniform1f(loc.uDpr, DPR);
+    gl.uniform1f(loc.uScale, 1.2);
+
+    gl.disable(gl.DEPTH_TEST);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE, gl.ONE);
+    gl.clearColor(0, 0, 0, 0);
+  } else {
+    /* ---------- Renderer 2 : Canvas2D fallback ---------- */
+    mode = "2d";
+    ctx2 = canvas.getContext("2d");
+    buildPoints();
+    canvas.style.background = "transparent";
+  }
+
+  /* ---------------- resize ---------------- */
+  let W = 0, H = 0, snowCvs = document.getElementById("snow"), snowCtx = null, sW = 0, sH = 0;
+  let zoom = 1;
+
+  function resize() {
+    W = Math.max(320, window.innerWidth);
+    H = Math.max(240, window.innerHeight);
+    zoom = Math.min(1, W / (H * 1.12));       // shrink the tree on tall/narrow screens
+    if (H > W) zoom = Math.min(0.58, zoom * 1.25);  // portrait: fill the phone screen
+    canvas.width  = Math.round(W * DPR);
+    canvas.height = Math.round(H * DPR);
+    if (gl) {
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.uniform1f(loc.uW, W);
+      gl.uniform1f(loc.uH, H);
+      gl.uniform1f(loc.uZoom, zoom);
+    }
+    snowCvs.width  = Math.round(W * DPR);
+    snowCvs.height = Math.round(H * DPR);
+    if (!gl) snowCvs.style.background = "transparent";
+    snowCtx = snowCvs.getContext("2d");
+    sW = snowCvs.width; sH = snowCvs.height;
+    initSnow();
+  }
+
+  /* ---------------- foreground 2D snowflakes (cf. init_snow2d) ---------------- */
+  const SNOW_N = 10;
+  let flakes = [];
+
+  function newFlake(f) {
+    const radius = rand(8, 13) * (sW / 1600);
+    const speed  = rand(30, 45) * (sH / 900);
+    const y      = rand(-80, -10);
+    const travel = sH + 80 - y;
+    const life   = travel / Math.max(1, speed);
+    f[0] = rand(0, sW); f[1] = y; f[2] = radius; f[3] = speed;
+    f[4] = life; f[5] = life;
+  }
+
+  function initSnow() {
+    flakes = [];
+    for (let i = 0; i < SNOW_N; i++) {
+      const f = [0, 0, 0, 0, 0, 0];
+      newFlake(f);
+      f[1] = rand(-80, sH);                 // scatter on first frame
+      const travel = sH + 80 - f[1];
+      f[4] = f[5] = travel / Math.max(1, f[3]);
+      flakes.push(f);
+    }
+  }
+
+  function updateSnow(dt) {
+    for (const f of flakes) {
+      f[1] += f[3] * dt;
+      f[4] -= dt;
+      if (f[4] <= 0 || f[1] > sH + 50) newFlake(f);
+    }
+  }
+
+  function drawSnow() {
+    snowCtx.setTransform(1, 0, 0, 1, 0, 0);
+    snowCtx.clearRect(0, 0, sW, sH);
+    snowCtx.globalCompositeOperation = "source-over";
+    for (const f of flakes) {
+      const [, y, r, , life, maxLife] = f;
+      if (maxLife <= 0) continue;
+      const phase = life / maxLife;
+      const alpha = phase > 0.3 ? 1 : Math.max(0, phase / 0.3);
+      const cx = f[0], cy = y;
+      const sizes = [1.5, 1.15, 0.86, 0.63, 0.5];
+      const alphas = [0.07, 0.13, 0.26, 0.52, 0.92];
+      for (let k = 0; k < 5; k++) {
+        const a = alpha * alphas[k];
+        if (a <= 0.004) continue;
+        snowCtx.beginPath();
+        snowCtx.fillStyle = "rgba(255,255,255," + a.toFixed(3) + ")";
+        snowCtx.arc(cx, cy, Math.max(1, r * sizes[k]), 0, TAU);
+        snowCtx.fill();
+      }
+    }
+    snowCtx.globalCompositeOperation = "source-over";
+  }
+
+  /* ---------------- canvas2D fallback draw ---------------- */
+  function draw2D(angle) {
+    const g = ctx2;
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.clearRect(0, 0, canvas.width, canvas.height);
+    g.globalCompositeOperation = "lighter";
+
+    const ca = Math.cos(angle), sa = Math.sin(angle);
+    const cp = Math.cos(PITCH), sp = Math.sin(PITCH);
+    const n = data.count;
+    const px = data.pos, rgb = data.rgb;
+    const depths = new Float32Array(n);
+
+    const Wb = canvas.width, Hb = canvas.height;
+    const k = Hb / 900;                       // scale relative to design height
+
+    for (let i = 0; i < n; i++) {
+      const i3 = i * 3;
+      const x = px[i3], y = px[i3 + 1], z = px[i3 + 2];
+      const xz = x * ca - z * sa;
+      const zz = x * sa + z * ca;
+      let yp = y * cp - zz * sp;
+      const zp = y * sp + zz * cp + CAM_DIST;
+      yp -= CAM_HEIGHT;
+      depths[i] = zp;
+      if (zp <= 0.1) continue;
+      const f = (900 * 0.63 * k * zoom) / zp;
+      const sx = Wb * 0.5 + xz * f;
+      const sy = Hb * 0.5 - yp * f;
+      const size = Math.max(1, (3.5 - zp * 0.125) * 1.35 * k * DPR * 0.75);
+      g.fillStyle = "rgba(" + (rgb[i3] * 255 | 0) + "," + (rgb[i3 + 1] * 255 | 0) + "," +
+                    (rgb[i3 + 2] * 255 | 0) + ",0.55)";
+      g.beginPath();
+      g.arc(sx, sy, size, 0, TAU);
+      g.fill();
+    }
+    g.globalCompositeOperation = "source-over";
+  }
+
+  /* ---------------- main loop ---------------- */
+  let angle = 0, last = performance.now(), paused = false;
+
+  function frame(now) {
+    const dt = Math.min(0.06, (now - last) / 1000);
+    last = now;
+    if (!paused) angle += SPEED * dt;
+
+    if (gl && prog) {
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.uniform1f(loc.uAngle, angle);
+      gl.drawArrays(gl.POINTS, 0, data.count);
+    } else {
+      draw2D(angle);
+    }
+
+    updateSnow(paused ? 0 : dt);
+    drawSnow();
+    requestAnimationFrame(frame);
+  }
+
+  /* ---------------- HUD / keys ---------------- */
+  function applyTheme(k) {
+    if (!THEMES[k]) return;
+    KEY = k;
+    theme = THEMES[k];
+    const rs = document.documentElement.style;
+    rs.setProperty("--accent", theme.color);
+    rs.setProperty("--bg1", theme.bg1);
+    rs.setProperty("--bg2", theme.bg2);
+    document.title = "Merry Christmas · " + theme.label;
+    buildPoints();
+    document.querySelectorAll("#hud .dot").forEach(d => {
+      d.classList.toggle("on", d.dataset.k === k);
+    });
+  }
+
+  (function hud() {
+    const box = document.getElementById("hud");
+    if (SINGLE) document.body.classList.add("single");
+    Object.keys(THEMES).forEach(k => {
+      const a = document.createElement("a");
+      a.className = "dot" + (k === KEY ? " on" : "");
+      a.dataset.k = k;
+      if (!SINGLE) a.href = "xmas-" + k + ".html";
+      a.title = THEMES[k].label;
+      a.style.background = THEMES[k].color;
+      a.style.color = THEMES[k].color;
+      a.addEventListener("click", e => {
+        e.preventDefault();
+        if (SINGLE) applyTheme(k);
+        else if (k !== KEY) location.href = "xmas-" + k + ".html";
+      });
+      box.appendChild(a);
+    });
+  })();
+
+  window.addEventListener("keydown", e => {
+    const k = e.key.toLowerCase();
+    if (k === " " || k === "p") { paused = !paused; e.preventDefault(); }
+    if (k === "f") {
+      if (!document.fullscreenElement) document.documentElement.requestFullscreen?.();
+      else document.exitFullscreen?.();
+    }
+    const order = ["1", "2", "3", "4"];
+    const keys  = Object.keys(THEMES);
+    const i     = order.indexOf(k);
+    if (i >= 0 && keys[i] && keys[i] !== KEY) {
+      e.preventDefault();
+      if (SINGLE) applyTheme(keys[i]);
+      else location.href = "xmas-" + keys[i] + ".html";
+    }
+  });
+
+  window.addEventListener("resize", resize);
+  resize();
+  requestAnimationFrame(frame);
+  console.log("[xmas] theme=" + KEY + " renderer=" + mode + " points=" + data.count);
+})();
+</script>
+</body>
+</html>
